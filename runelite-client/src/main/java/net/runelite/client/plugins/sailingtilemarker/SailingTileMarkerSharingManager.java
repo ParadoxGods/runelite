@@ -27,6 +27,7 @@ package net.runelite.client.plugins.sailingtilemarker;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.Runnables;
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
@@ -44,93 +45,56 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
-import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
-import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
-import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.menus.MenuManager;
-import net.runelite.client.ui.overlay.worldmap.WorldMapPointManager;
+import net.runelite.client.menus.WidgetMenuOption;
 
 @Slf4j
 class SailingTileMarkerSharingManager
 {
-	private static final String SAILING_MARK = "Sailing Mark";
-	private static final String EXPORT_SAILING_MARKERS_OPTION = "Export Sailing Markers";
-	private static final String IMPORT_SAILING_MARKERS_OPTION = "Import Sailing Markers";
-	private static final String CLEAR_SAILING_MARKERS_OPTION = "Clear Sailing Markers";
+	private static final WidgetMenuOption EXPORT_MARKERS_OPTION = new WidgetMenuOption("Export", "Sailing Markers", InterfaceID.Orbs.WORLDMAP, InterfaceID.OrbsNomap.WORLDMAP);
+	private static final WidgetMenuOption IMPORT_MARKERS_OPTION = new WidgetMenuOption("Import", "Sailing Markers", InterfaceID.Orbs.WORLDMAP, InterfaceID.OrbsNomap.WORLDMAP);
+	private static final WidgetMenuOption CLEAR_MARKERS_OPTION = new WidgetMenuOption("Clear", "Sailing Markers", InterfaceID.Orbs.WORLDMAP, InterfaceID.OrbsNomap.WORLDMAP);
+
+	private final SailingTileMarkerPlugin plugin;
+	private final Client client;
+	private final MenuManager menuManager;
+	private final ChatMessageManager chatMessageManager;
+	private final ChatboxPanelManager chatboxPanelManager;
+	private final Gson gson;
 
 	@Inject
-	private Client client;
-
-	@Inject
-	private SailingTileMarkerPlugin plugin;
-
-	@Inject
-	private SailingTileMarkerConfig config;
-
-	@Inject
-	private Gson gson;
-
-	@Inject
-	private ChatMessageManager chatMessageManager;
-
-	@Inject
-	private MenuManager menuManager;
-
-	@Inject
-	private WorldMapPointManager worldMapPointManager;
+	private SailingTileMarkerSharingManager(SailingTileMarkerPlugin plugin, Client client, MenuManager menuManager,
+		ChatMessageManager chatMessageManager, ChatboxPanelManager chatboxPanelManager, Gson gson)
+	{
+		this.plugin = plugin;
+		this.client = client;
+		this.menuManager = menuManager;
+		this.chatMessageManager = chatMessageManager;
+		this.chatboxPanelManager = chatboxPanelManager;
+		this.gson = gson;
+	}
 
 	void addImportExportMenuOptions()
 	{
-		menuManager.addManagedCustomMenu(EXPORT_SAILING_MARKERS_OPTION, this::exportSailingMarkers);
-		menuManager.addManagedCustomMenu(IMPORT_SAILING_MARKERS_OPTION, this::promptForImport);
+		menuManager.addManagedCustomMenu(EXPORT_MARKERS_OPTION, this::exportSailingMarkers);
+		menuManager.addManagedCustomMenu(IMPORT_MARKERS_OPTION, this::promptForImport);
 	}
 
 	void addClearMenuOption()
 	{
-		menuManager.addManagedCustomMenu(CLEAR_SAILING_MARKERS_OPTION, this::promptForClear);
+		menuManager.addManagedCustomMenu(CLEAR_MARKERS_OPTION, this::promptForClear);
 	}
 
 	void removeMenuOptions()
 	{
-		menuManager.removeManagedCustomMenu(EXPORT_SAILING_MARKERS_OPTION);
-		menuManager.removeManagedCustomMenu(IMPORT_SAILING_MARKERS_OPTION);
-		menuManager.removeManagedCustomMenu(CLEAR_SAILING_MARKERS_OPTION);
-	}
-
-	@Subscribe
-	public void onMenuEntryAdded(MenuEntryAdded event)
-	{
-		if (!config.showImportExport())
-		{
-			return;
-		}
-
-		final boolean isWorldMapOrbOption = event.getOption().equals("Floating World Map")
-			&& event.getTarget().isEmpty();
-
-		if (isWorldMapOrbOption)
-		{
-			client.createMenuEntry(-1)
-				.setOption(EXPORT_SAILING_MARKERS_OPTION)
-				.setTarget("")
-				.setType(MenuAction.RUNELITE)
-				.onClick(this::exportSailingMarkers);
-
-			client.createMenuEntry(-1)
-				.setOption(IMPORT_SAILING_MARKERS_OPTION)
-				.setTarget("")
-				.setType(MenuAction.RUNELITE)
-				.onClick(this::promptForImport);
-
-			client.createMenuEntry(-1)
-				.setOption(CLEAR_SAILING_MARKERS_OPTION)
-				.setTarget("")
-				.setType(MenuAction.RUNELITE)
-				.onClick(this::promptForClear);
-		}
+		menuManager.removeManagedCustomMenu(EXPORT_MARKERS_OPTION);
+		menuManager.removeManagedCustomMenu(IMPORT_MARKERS_OPTION);
+		menuManager.removeManagedCustomMenu(CLEAR_MARKERS_OPTION);
 	}
 
 	private void exportSailingMarkers(MenuEntry menuEntry)
@@ -141,25 +105,25 @@ class SailingTileMarkerSharingManager
 			return;
 		}
 
-		// Collect all markers from loaded regions
-		List<SailingTileMarkerPoint> activeMarkerPoints = Arrays.stream(regions)
+		List<SailingTileMarkerPoint> activePoints = Arrays.stream(regions)
 			.mapToObj(regionId -> plugin.getPoints(regionId).stream())
 			.flatMap(Function.identity())
 			.collect(Collectors.toList());
 
-		if (activeMarkerPoints.isEmpty())
+		if (activePoints.isEmpty())
 		{
-			sendChatMessage("You have no sailing markers to export in your currently loaded regions.");
+			sendChatMessage("You have no sailing markers to export.");
 			return;
 		}
 
-		final String exportDump = gson.toJson(activeMarkerPoints);
+		final String exportDump = gson.toJson(activePoints);
+
+		log.debug("Exported sailing markers: {}", exportDump);
 
 		Toolkit.getDefaultToolkit()
 			.getSystemClipboard()
 			.setContents(new StringSelection(exportDump), null);
-
-		sendChatMessage(activeMarkerPoints.size() + " sailing markers were copied to your clipboard.");
+		sendChatMessage(activePoints.size() + " sailing markers were copied to your clipboard.");
 	}
 
 	private void promptForImport(MenuEntry menuEntry)
@@ -179,75 +143,78 @@ class SailingTileMarkerSharingManager
 			return;
 		}
 
+		log.debug("Clipboard contents: {}", clipboardText);
 		if (Strings.isNullOrEmpty(clipboardText))
 		{
 			sendChatMessage("You do not have any sailing markers copied in your clipboard.");
 			return;
 		}
 
-		List<SailingTileMarkerPoint> importMarkers;
+		List<SailingTileMarkerPoint> importPoints;
 		try
 		{
-			importMarkers = gson.fromJson(clipboardText, new TypeToken<List<SailingTileMarkerPoint>>(){}.getType());
+			// CHECKSTYLE:OFF
+			importPoints = gson.fromJson(clipboardText, new TypeToken<List<SailingTileMarkerPoint>>(){}.getType());
+			// CHECKSTYLE:ON
 		}
-		catch (Exception e)
+		catch (JsonSyntaxException e)
 		{
-			sendChatMessage("The clipboard data does not contain valid sailing markers.");
-			log.debug("error importing sailing markers", e);
+			log.debug("Malformed JSON for clipboard import", e);
+			sendChatMessage("You do not have any sailing markers copied in your clipboard.");
 			return;
 		}
 
-		if (importMarkers.isEmpty())
+		if (importPoints.isEmpty())
 		{
-			sendChatMessage("The clipboard data does not contain any sailing markers.");
+			sendChatMessage("You do not have any sailing markers copied in your clipboard.");
 			return;
 		}
 
-		importSailingMarkers(importMarkers);
+		chatboxPanelManager.openTextMenuInput("Are you sure you want to import " + importPoints.size() + " sailing markers?")
+			.option("Yes", () -> importSailingMarkers(importPoints))
+			.option("No", Runnables.doNothing())
+			.build();
 	}
 
 	private void importSailingMarkers(Collection<SailingTileMarkerPoint> importPoints)
 	{
-		// Group markers by region
-		Map<Integer, List<SailingTileMarkerPoint>> regionGroupedMarkers = importPoints.stream()
+		// regions being imported may not be loaded on client,
+		// so need to import each bunch directly into the config
+		// first, collate the list of unique region ids in the import
+		Map<Integer, List<SailingTileMarkerPoint>> regionGroupedPoints = importPoints.stream()
 			.collect(Collectors.groupingBy(SailingTileMarkerPoint::getRegionId));
 
-		int importedCount = 0;
-
-		// Import each region's markers
-		for (Map.Entry<Integer, List<SailingTileMarkerPoint>> entry : regionGroupedMarkers.entrySet())
+		// now import each region into the config
+		regionGroupedPoints.forEach((regionId, groupedPoints) ->
 		{
-			int regionId = entry.getKey();
-			List<SailingTileMarkerPoint> groupedMarkers = entry.getValue();
+			// combine imported points with existing region points
+			log.debug("Importing {} points to region {}", groupedPoints.size(), regionId);
+			Collection<SailingTileMarkerPoint> regionPoints = plugin.getPoints(regionId);
 
-			// Get existing markers for this region
-			Collection<SailingTileMarkerPoint> existingMarkers = plugin.getPoints(regionId);
+			List<SailingTileMarkerPoint> mergedList = new ArrayList<>(regionPoints.size() + groupedPoints.size());
+			// add existing points
+			mergedList.addAll(regionPoints);
 
-			// Create merged list
-			List<SailingTileMarkerPoint> mergedList = new ArrayList<>(existingMarkers.size() + groupedMarkers.size());
-			mergedList.addAll(existingMarkers);
-
-			// Add new markers, avoiding duplicates
-			for (SailingTileMarkerPoint marker : groupedMarkers)
+			// add new points
+			for (SailingTileMarkerPoint point : groupedPoints)
 			{
-				if (!mergedList.contains(marker))
+				// filter out duplicates
+				if (!mergedList.contains(point))
 				{
-					mergedList.add(marker);
-					importedCount++;
+					mergedList.add(point);
 				}
 			}
 
-			// Save the merged list
 			plugin.savePoints(regionId, mergedList);
-		}
+		});
 
-		// Reload all points to update the display
+		// reload points from config
+		log.debug("Reloading points after import");
 		plugin.loadPoints();
-
-		sendChatMessage(importedCount + " sailing markers were imported from the clipboard.");
+		sendChatMessage(importPoints.size() + " sailing markers were imported from the clipboard.");
 	}
 
-	private void promptForClear(MenuEntry menuEntry)
+	private void promptForClear(MenuEntry entry)
 	{
 		int[] regions = client.getMapRegions();
 		if (regions == null)
@@ -255,43 +222,31 @@ class SailingTileMarkerSharingManager
 			return;
 		}
 
-		// Count total markers in loaded regions
-		long markerCount = Arrays.stream(regions)
-			.mapToObj(regionId -> plugin.getPoints(regionId))
-			.mapToLong(Collection::size)
+		long numActivePoints = Arrays.stream(regions)
+			.mapToLong(regionId -> plugin.getPoints(regionId).size())
 			.sum();
 
-		if (markerCount == 0)
+		if (numActivePoints == 0)
 		{
-			sendChatMessage("You have no sailing markers to clear in your currently loaded regions.");
+			sendChatMessage("You have no sailing markers to clear.");
 			return;
 		}
 
-		clearSailingMarkers();
-	}
+		chatboxPanelManager.openTextMenuInput("Are you sure you want to clear the<br>" + numActivePoints + " currently loaded sailing markers?")
+			.option("Yes", () ->
+			{
+				for (int regionId : regions)
+				{
+					plugin.savePoints(regionId, null);
+				}
 
-	private void clearSailingMarkers()
-	{
-		int[] regions = client.getMapRegions();
-		if (regions == null)
-		{
-			return;
-		}
+				plugin.loadPoints();
+				sendChatMessage(numActivePoints + " sailing marker"
+					+ (numActivePoints == 1 ? " was cleared." : "s were cleared."));
 
-		int clearedCount = 0;
-
-		// Clear markers from all loaded regions
-		for (int regionId : regions)
-		{
-			Collection<SailingTileMarkerPoint> regionMarkers = plugin.getPoints(regionId);
-			clearedCount += regionMarkers.size();
-			plugin.savePoints(regionId, null);
-		}
-
-		// Reload to update display
-		plugin.loadPoints();
-
-		sendChatMessage(clearedCount + " sailing markers were cleared from your currently loaded regions.");
+			})
+			.option("No", Runnables.doNothing())
+			.build();
 	}
 
 	private void sendChatMessage(final String message)

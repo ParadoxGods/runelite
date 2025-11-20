@@ -41,9 +41,8 @@ public interface SailingTileMarkerConfig extends Config
 	@Alpha
 	@ConfigItem(
 		keyName = "markerColor",
-		name = "Default marker color",
-		description = "Configures the default color of sailing tile markers",
-		position = 0
+		name = "Tile color",
+		description = "The default color for marked sailing tiles."
 	)
 	default Color markerColor()
 	{
@@ -51,21 +50,29 @@ public interface SailingTileMarkerConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "rememberTileColors",
-		name = "Remember tile colors",
-		description = "Color tiles using the color from the color picker",
-		position = 1
+		keyName = "drawOnMinimap",
+		name = "Draw tiles on minimap",
+		description = "Configures whether marked sailing tiles should be drawn on minimap."
 	)
-	default boolean rememberTileColors()
+	default boolean drawTileOnMinimmap()
 	{
 		return false;
 	}
 
 	@ConfigItem(
+		keyName = SHOW_IMPORT_EXPORT_KEY_NAME,
+		name = "Show import/export/clear options",
+		description = "Show the Import, Export, and Clear options on the world map orb right-click menu."
+	)
+	default boolean showImportExport()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "borderWidth",
 		name = "Border width",
-		description = "Configures the width of the marked tile border",
-		position = 2
+		description = "Width of the marked tile border."
 	)
 	default double borderWidth()
 	{
@@ -75,45 +82,13 @@ public interface SailingTileMarkerConfig extends Config
 	@ConfigItem(
 		keyName = "fillOpacity",
 		name = "Fill opacity",
-		description = "Configures the opacity of the marked tile fill color",
-		position = 3
+		description = "Opacity of the tile fill color."
 	)
-	@Range(max = 255)
+	@Range(
+		max = 255
+	)
 	default int fillOpacity()
 	{
 		return 50;
-	}
-
-	@ConfigItem(
-		keyName = "drawOnMinimap",
-		name = "Draw tiles on minimap",
-		description = "Configures whether marked sailing tiles should also be drawn on the minimap",
-		position = 4
-	)
-	default boolean drawTileOnMinimmap()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = SHOW_IMPORT_EXPORT_KEY_NAME,
-		name = "Show Import/Export options",
-		description = "Show Import/Export/Clear options on the world map orb for sharing markers with friends",
-		position = 5
-	)
-	default boolean showImportExport()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "showLabels",
-		name = "Show labels",
-		description = "Configures whether to show labels for marked tiles",
-		position = 6
-	)
-	default boolean showLabels()
-	{
-		return true;
 	}
 }

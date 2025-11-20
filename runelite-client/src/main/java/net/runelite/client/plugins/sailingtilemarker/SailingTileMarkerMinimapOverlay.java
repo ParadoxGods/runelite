@@ -79,9 +79,9 @@ class SailingTileMarkerMinimapOverlay extends Overlay
 				}
 
 				Color tileColor = point.getColor();
-				if (tileColor == null || !config.rememberTileColors())
+				if (tileColor == null)
 				{
-					// Use default color from config
+					// If this is an old tile which has no color, use marker color
 					tileColor = config.markerColor();
 				}
 

@@ -178,8 +178,8 @@ public class SailingTileMarkerPlugin extends Plugin
 
 		for (int regionId : regions)
 		{
-			// Load points for region
-			log.debug("Loading sailing markers for region {}", regionId);
+			// load points for region
+			log.debug("Loading points for region {}", regionId);
 			Collection<SailingTileMarkerPoint> regionPoints = getPoints(regionId);
 			Collection<ColorTileMarker> colorTileMarkers = translateToColorTileMarker(wv, regionPoints);
 			points.putAll(wv, colorTileMarkers);
@@ -223,13 +223,11 @@ public class SailingTileMarkerPlugin extends Plugin
 			sharingManager.addClearMenuOption();
 		}
 		loadPoints();
-		eventBus.register(sharingManager);
 	}
 
 	@Override
 	public void shutDown()
 	{
-		eventBus.unregister(sharingManager);
 		overlayManager.remove(overlay);
 		overlayManager.remove(minimapOverlay);
 		sharingManager.removeMenuOptions();

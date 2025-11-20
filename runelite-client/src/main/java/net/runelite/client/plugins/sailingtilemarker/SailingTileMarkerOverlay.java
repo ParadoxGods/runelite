@@ -33,7 +33,7 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Stroke;
-import java.awt.geom.Point2D;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
@@ -87,9 +87,9 @@ public class SailingTileMarkerOverlay extends Overlay
 				}
 
 				Color tileColor = point.getColor();
-				if (tileColor == null || !config.rememberTileColors())
+				if (tileColor == null)
 				{
-					// Use default color from config
+					// If this is an old tile which has no color, use marker color
 					tileColor = config.markerColor();
 				}
 
@@ -100,19 +100,19 @@ public class SailingTileMarkerOverlay extends Overlay
 		return null;
 	}
 
-	private void drawTile(Graphics2D graphics, WorldView worldView, WorldPoint point, Color color, String label, Stroke borderStroke)
+	private void drawTile(Graphics2D graphics, WorldView wv, WorldPoint point, Color color, @Nullable String label, Stroke borderStroke)
 	{
-		// Don't draw tiles too far away from the player in the top level world view
-		if (worldView.isTopLevel())
+		if (wv.isTopLevel())
 		{
 			WorldPoint playerLocation = client.getLocalPlayer().getWorldLocation();
+
 			if (point.distanceTo(playerLocation) >= MAX_DRAW_DISTANCE)
 			{
 				return;
 			}
 		}
 
-		LocalPoint lp = LocalPoint.fromWorld(worldView, point);
+		LocalPoint lp = LocalPoint.fromWorld(wv, point);
 		if (lp == null)
 		{
 			return;
@@ -124,7 +124,7 @@ public class SailingTileMarkerOverlay extends Overlay
 			OverlayUtil.renderPolygon(graphics, poly, color, new Color(0, 0, 0, config.fillOpacity()), borderStroke);
 		}
 
-		if (!Strings.isNullOrEmpty(label) && config.showLabels())
+		if (!Strings.isNullOrEmpty(label))
 		{
 			Point canvasTextLocation = Perspective.getCanvasTextLocation(client, graphics, lp, label, 0);
 			if (canvasTextLocation != null)
