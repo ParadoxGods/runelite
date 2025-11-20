@@ -158,10 +158,21 @@ public interface EntityHiderConfig extends Config
 	@ConfigItem(
 		position = 12,
 		keyName = "hideWorldEntities",
-		name = "Hide boats",
-		description = "Configures whether boats are hidden."
+		name = "Hide all boats",
+		description = "Configures whether all boats (including NPC boats) are hidden."
 	)
 	default boolean hideWorldEntities()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		position = 13,
+		keyName = "hidePlayerBoats",
+		name = "Hide player boats",
+		description = "Configures whether other players' boats are hidden, but keeps NPC boats visible."
+	)
+	default boolean hidePlayerBoats()
 	{
 		return false;
 	}

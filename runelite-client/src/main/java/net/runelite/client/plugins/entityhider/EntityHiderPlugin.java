@@ -37,6 +37,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Projectile;
 import net.runelite.api.Renderable;
 import net.runelite.api.Scene;
+import net.runelite.api.WorldEntity;
 import net.runelite.api.WorldView;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.SpotanimID;
@@ -115,6 +116,7 @@ public class EntityHiderPlugin extends Plugin
 	private boolean hideNPCs;
 	private boolean hideNPCs2D;
 	private boolean hideBoats;
+	private boolean hidePlayerBoats;
 	private boolean hideDeadNpcs;
 	private boolean hidePets;
 	private boolean hideThralls;
@@ -172,6 +174,7 @@ public class EntityHiderPlugin extends Plugin
 		hideDeadNpcs = config.hideDeadNpcs();
 
 		hideBoats = config.hideWorldEntities();
+		hidePlayerBoats = config.hidePlayerBoats();
 
 		hidePets = config.hidePets();
 
@@ -297,21 +300,52 @@ public class EntityHiderPlugin extends Plugin
 		}
 		else if (renderable instanceof Scene)
 		{
-			if (!hideBoats)
-			{
-				return true;
-			}
-
 			Scene scene = (Scene) renderable;
 			Player local = client.getLocalPlayer();
-			WorldView wv = local.getWorldView();
+			WorldView localWv = local.getWorldView();
 
-			if (scene.getWorldViewId() == wv.getId())
+			// Don't hide local player's boat
+			if (scene.getWorldViewId() == localWv.getId())
 			{
 				return true;
 			}
 
-			return false;
+			// If hideBoats is enabled, hide all boats (player and NPC)
+			if (hideBoats)
+			{
+				return false;
+			}
+
+			// If hidePlayerBoats is enabled, only hide player boats (not NPC boats)
+			if (hidePlayerBoats)
+			{
+				// Find the WorldView for this boat
+				WorldView topLevelWv = client.getTopLevelWorldView();
+				if (topLevelWv != null)
+				{
+					for (WorldEntity worldEntity : topLevelWv.worldEntities())
+					{
+						WorldView boatWv = worldEntity.getWorldView();
+						if (boatWv != null && boatWv.getId() == scene.getWorldViewId())
+						{
+							// Check if this boat has any players in it (excluding local player)
+							// If it has players, it's a player boat, so hide it
+							for (Player player : boatWv.players())
+							{
+								if (player != null && player != local)
+								{
+									// This is another player's boat, hide it
+									return false;
+								}
+							}
+							// No other players found, this is an NPC boat, keep it visible
+							break;
+						}
+					}
+				}
+			}
+
+			return true;
 		}
 
 		return true;
